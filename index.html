@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGrab — URL → Word</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #7c6dfa;
+    --accent2: #fa6d8a;
+    --green: #4dffa0;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,109,250,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,109,250,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+  }
+
+  /* Section */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* URL Input area */
+  .url-area {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+  .url-area:focus-within { border-color: var(--accent); }
+
+  .url-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .url-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .url-input::placeholder { color: var(--muted); }
+  .url-input:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #6055d4);
+    color: white;
+  }
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent2);
+    border: 1px solid transparent;
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+  .btn-danger:hover { background: rgba(250,109,138,0.1); }
+
+  .btn-success {
+    background: linear-gradient(135deg, #1a7a4a, #12b75a);
+    color: white;
+    padding: 14px 32px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+  .btn-success:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-success:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* URL list */
+  .url-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .url-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    animation: slideIn 0.2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .url-index {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 24px;
+  }
+
+  .url-text {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .url-status {
+    font-size: 16px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* Options */
+  .options-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .opt-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .opt-chip:hover { border-color: var(--accent); color: var(--text); }
+  .opt-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(124,109,250,0.08); }
+
+  .opt-chip input { display: none; }
+
+  /* Progress */
+  .progress-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .progress-block.visible { display: block; }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .progress-title { font-weight: 600; font-size: 14px; }
+  .progress-count { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+
+  .progress-bar-wrap {
+    background: var(--surface);
+    border-radius: 6px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 6px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .log-area {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .log-line { color: var(--muted); }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--accent2); }
+  .log-line.info { color: var(--accent); }
+
+  /* Preview */
+  .preview-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .preview-block.visible { display: block; }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .preview-stats {
+    display: flex;
+    gap: 20px;
+  }
+
+  .stat {
+    text-align: center;
+  }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .preview-text {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #c8c8d8;
+    white-space: pre-wrap;
+    font-family: var(--mono);
+  }
+
+  /* Actions */
+  .actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-word {
+    background: linear-gradient(135deg, #1b5e9e, #2679c8);
+    color: white;
+    padding: 16px 36px;
+    font-size: 15px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-weight: 600;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-word:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(38,121,200,0.3); }
+  .btn-word:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-txt {
+    background: transparent;
+    color: var(--muted);
+    padding: 16px 24px;
+    font-size: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--sans);
+    font-weight: 500;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-txt:hover { border-color: var(--muted); color: var(--text); }
+  .btn-txt:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Pulse animation for scraping */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulsing { animation: pulse 1.2s infinite; }
+
+  /* Empty state */
+  .empty-hint {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 2;
+  }
+  .empty-hint .big { font-size: 36px; display: block; margin-bottom: 8px; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🕸️</div>
+      <div class="logo-text">Web<span>Grab</span></div>
+    </div>
+    <div class="tagline">// URL → Tartibli matn → Word — sarlavha, bo'lim, ro'yxatlarni saqlaydi</div>
+  </div>
+
+  <!-- Step 1: URL qo'shish -->
+  <div class="section-label">01 — URL lar kiriting</div>
+  <div class="url-area">
+    <div class="url-row">
+      <input
+        type="text"
+        class="url-input"
+        id="urlInput"
+        placeholder="https://example.com/page"
+        onkeydown="if(event.key==='Enter') addUrl()"
+      />
+      <button class="btn btn-primary" onclick="addUrl()">+ Qo'shish</button>
+      <button class="btn btn-ghost" onclick="clearAll()">Tozalash</button>
+    </div>
+    <div class="url-list" id="urlList">
+      <div class="empty-hint">
+        <span class="big">🔗</span>
+        URL kiriting va Enter bosing.<br>
+        Ko'p sahifalarni qo'shib akkumulyatsiya qilish mumkin.
+      </div>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="section-label">02 — Sozlamalar</div>
+  <div class="options-bar">
+    <label class="opt-chip active" id="chip-include-title" onclick="toggleChip(event, this)">
+      <input type="checkbox" checked id="opt-title"> 📌 Sarlavha qo'shish
+    </label>
+    <label class="opt-chip active" id="chip-include-source" onclick="toggleChip(event, this)">
+      <input type="checkbox" checked id="opt-source"> 🔗 Manba URL
+    </label>
+    <label class="opt-chip active" id="chip-include-date" onclick="toggleChip(event, this)">
+      <input type="checkbox" checked id="opt-date"> 📅 Sana/Vaqt
+    </label>
+    <label class="opt-chip active" id="chip-structure-mode" onclick="toggleChip(event, this)">
+      <input type="checkbox" checked id="opt-structure"> 🧱 Tartibni saqlash
+    </label>
+    <label class="opt-chip active" id="chip-boilerplate-mode" onclick="toggleChip(event, this)">
+      <input type="checkbox" checked id="opt-boilerplate"> 🧹 Menyu/reklamani tozalash
+    </label>
+    <label class="opt-chip" id="chip-clean-mode" onclick="toggleChip(event, this)">
+      <input type="checkbox" id="opt-clean"> ✨ Faqat asosiy matn
+    </label>
+  </div>
+
+  <!-- Scrape button -->
+  <div style="margin-bottom:32px;">
+    <button class="btn-success" id="scrapeBtn" onclick="startScraping()">
+      ⚡ Boshlash — Matn olish
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-block" id="progressBlock">
+    <div class="progress-header">
+      <span class="progress-title pulsing" id="progressTitle">Ishlanmoqda...</span>
+      <span class="progress-count" id="progressCount">0 / 0</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="log-area" id="logArea"></div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-block" id="previewBlock">
+    <div class="preview-header">
+      <div class="section-label" style="margin:0">03 — Natija</div>
+      <div class="preview-stats">
+        <div class="stat">
+          <span class="stat-num" id="statPages">0</span>
+          <span class="stat-label">sahifa</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" id="statWords">0</span>
+          <span class="stat-label">so'z</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" id="statChars">0</span>
+          <span class="stat-label">belgi</span>
+        </div>
+      </div>
+    </div>
+    <div class="preview-text" id="previewText"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions" id="actionsBar" style="display:none">
+    <button class="btn-word" id="wordBtn" onclick="downloadWord()">
+      📄 Word (.doc) yuklab olish
+    </button>
+    <button class="btn-txt" id="txtBtn" onclick="downloadTxt()">
+      📝 .txt yuklab olish
+    </button>
+    <button class="btn-txt" id="copyBtn" onclick="copyToClipboard()">
+      📋 Matnni nusxalash
+    </button>
+    <button class="btn-ghost btn" onclick="resetAll()" style="padding:16px 20px">
+      🔄 Qayta boshlash
+    </button>
+  </div>
+
+</div>
+
+<script>
+
+  let urls = [];
+  let scrapedData = [];
+
+  // ─── URL management ───────────────────────────────────────────────────────
+  function addUrl() {
+    const input = document.getElementById('urlInput');
+    let url = input.value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+    try {
+      url = new URL(url).href;
+    } catch {
+      flashInput(input, '#fa6d8a');
+      alert('URL noto\'g\'ri formatda. Masalan: https://example.com/page');
+      return;
+    }
+
+    if (urls.includes(url)) {
+      flashInput(input, '#fa6d8a');
+      return;
+    }
+
+    urls.push(url);
+    input.value = '';
+    renderUrlList();
+    flashInput(input, '#4dffa0');
+  }
+
+  function removeUrl(i) {
+    urls.splice(i, 1);
+    renderUrlList();
+  }
+
+  function clearAll() {
+    urls = [];
+    renderUrlList();
+  }
+
+  function renderUrlList() {
+    const list = document.getElementById('urlList');
+    if (urls.length === 0) {
+      list.innerHTML = `<div class="empty-hint">
+        <span class="big">🔗</span>
+        URL kiriting va Enter bosing.<br>Ko'p sahifalarni qo'shib akkumulyatsiya qilish mumkin.
+      </div>`;
+      return;
+    }
+    list.innerHTML = urls.map((u, i) => `
+      <div class="url-item">
+        <span class="url-index">${String(i+1).padStart(2,'0')}</span>
+        <span class="url-text" title="${escapeAttr(u)}">${escapeHtml(u)}</span>
+        <span class="url-status" id="status-${i}">⏳</span>
+        <button class="btn btn-danger" onclick="removeUrl(${i})">×</button>
+      </div>
+    `).join('');
+  }
+
+  function setUrlStatus(i, icon) {
+    const el = document.getElementById('status-' + i);
+    if (el) el.textContent = icon;
+  }
+
+  function flashInput(el, color) {
+    el.style.borderColor = color;
+    setTimeout(() => el.style.borderColor = '', 800);
+  }
+
+  // ─── Options ──────────────────────────────────────────────────────────────
+  function toggleChip(event, chip) {
+    // Prevent label's default checkbox toggle so state changes exactly once
+    if (event) event.preventDefault();
+    const cb = chip.querySelector('input[type=checkbox]');
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    chip.classList.toggle('active', cb.checked);
+  }
+
+  function opt(id) {
+    const el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
+
+  // ─── Scraping ─────────────────────────────────────────────────────────────
+  async function startScraping() {
+    if (urls.length === 0) {
+      alert('Kamida bitta URL kiriting!');
+      return;
+    }
+
+    scrapedData = [];
+    document.getElementById('scrapeBtn').disabled = true;
+    document.getElementById('progressTitle').textContent = 'Ishlanmoqda...';
+    document.getElementById('progressTitle').classList.add('pulsing');
+    document.getElementById('progressBlock').classList.add('visible');
+    document.getElementById('previewBlock').classList.remove('visible');
+    document.getElementById('actionsBar').style.display = 'none';
+    document.getElementById('logArea').innerHTML = '';
+    document.getElementById('progressBar').style.width = '0%';
+
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      updateProgress(i, urls.length, url);
+      setUrlStatus(i, '⚡');
+
+      log(`[${i+1}/${urls.length}] Yuklanmoqda: ${url}`, 'info');
+
+      try {
+        const page = await fetchPage(url);
+        if (page && page.text && page.text.length > 50) {
+          scrapedData.push({ ...page, index: i + 1 });
+          setUrlStatus(i, '✅');
+          log(`✓ ${page.text.length.toLocaleString()} belgi olindi — ${page.title || 'Sarlavhasiz'}`, 'ok');
+        } else {
+          setUrlStatus(i, '⚠️');
+          log(`⚠ Matn kam yoki bo'sh`, 'err');
+        }
+      } catch (e) {
+        setUrlStatus(i, '❌');
+        log(`✗ Xato: ${e.message}`, 'err');
+      }
+
+      updateProgress(i + 1, urls.length, '');
+      await sleep(600);
+    }
+
+    document.getElementById('progressTitle').textContent = '✅ Tayyor!';
+    document.getElementById('progressTitle').classList.remove('pulsing');
+    document.getElementById('scrapeBtn').disabled = false;
+
+    if (scrapedData.length > 0) {
+      showPreview();
+    } else {
+      log('⚠ Hech qanday matn olinmadi. URLlarni tekshiring.', 'err');
+    }
+  }
+
+  async function fetchPage(url) {
+    // Jina.ai Reader: no key needed, returns readable Markdown-like text.
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    let raw = '';
+    try {
+      const res = await fetch(jinaUrl, {
+        headers: { 'Accept': 'text/plain' },
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      raw = await res.text();
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('60 soniyada javob kelmadi');
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    return normalizeJinaResult(raw, url);
+  }
+
+  // ─── Text normalization / ordering ────────────────────────────────────────
+  function normalizeJinaResult(raw, url) {
+    const keepStructure = opt('opt-structure');
+    const removeBoilerplateOn = opt('opt-boilerplate');
+    const plainOnly = opt('opt-clean');
+
+    raw = normalizeNewlines(raw || '').trim();
+    const meta = extractJinaMeta(raw);
+    let body = meta.body || raw;
+
+    if (removeBoilerplateOn) body = removeBoilerplate(body);
+
+    const title = cleanupInline(meta.title || extractFirstHeading(body) || guessTitleFromUrl(url));
+
+    // If Jina returned the title as first H1, remove duplicate from body.
+    body = removeDuplicateLeadingTitle(body, title);
+
+    let text;
+    let markdown;
+
+    if (plainOnly) {
+      markdown = markdownToPlain(body, { keepLinks: false, keepStructure: false });
+      text = markdown;
+    } else if (keepStructure) {
+      markdown = tidyMarkdown(body);
+      text = markdownToPlain(markdown, { keepLinks: true, keepStructure: true });
+    } else {
+      markdown = body.trim();
+      text = body.trim();
+    }
+
+    text = finalTextCleanup(text);
+    markdown = finalMarkdownCleanup(markdown);
+
+    return {
+      url,
+      title,
+      text,
+      markdown,
+      rawLength: raw.length,
+      words: countWords(text),
+      chars: text.length
+    };
+  }
+
+  function normalizeNewlines(str) {
+    return str.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
+  }
+
+  function extractJinaMeta(raw) {
+    const meta = {};
+    let body = raw;
+    const marker = raw.match(/(?:^|\n)Markdown Content:\s*\n/i);
+    if (marker) {
+      const head = raw.slice(0, marker.index).trim();
+      body = raw.slice(marker.index + marker[0].length).trim();
+      head.split('\n').forEach(line => {
+        const m = line.match(/^([A-Za-z][A-Za-z ]{1,40}):\s*(.+)$/);
+        if (!m) return;
+        const key = m[1].trim().toLowerCase();
+        meta[key] = m[2].trim();
+      });
+    } else {
+      // Some pages are returned without the explicit marker. Remove common Jina headers.
+      body = raw
+        .replace(/^Title:\s*(.+?)\n+/i, (_, t) => { meta.title = t.trim(); return ''; })
+        .replace(/^URL Source:\s*.+?\n+/im, '')
+        .replace(/^Published Time:\s*.+?\n+/im, '');
+    }
+    return {
+      title: meta.title,
+      source: meta['url source'],
+      body
+    };
+  }
+
+  function extractFirstHeading(md) {
+    const m = md.match(/^\s*#{1,2}\s+(.+)$/m);
+    if (m) return m[1].trim();
+    const firstGoodLine = md.split('\n').map(x => x.trim()).find(line =>
+      line.length > 8 && line.length < 140 && !/^[-*+>|`]/.test(line) && !/^https?:\/\//i.test(line)
+    );
+    return firstGoodLine || '';
+  }
+
+  function guessTitleFromUrl(url) {
+    try {
+      const u = new URL(url);
+      const last = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || u.hostname);
+      return last.replace(/[-_]+/g, ' ').replace(/\.[a-z0-9]{2,5}$/i, '').trim() || u.hostname;
+    } catch {
+      return 'Sahifa';
+    }
+  }
+
+  function removeDuplicateLeadingTitle(md, title) {
+    if (!title) return md;
+    const lines = md.split('\n');
+    const normTitle = normalizeForCompare(title);
+    while (lines.length && !lines[0].trim()) lines.shift();
+    if (!lines.length) return md;
+    const first = lines[0].replace(/^#{1,6}\s+/, '').trim();
+    if (normalizeForCompare(first) === normTitle) {
+      lines.shift();
+      while (lines.length && !lines[0].trim()) lines.shift();
+    }
+    return lines.join('\n');
+  }
+
+  function removeBoilerplate(md) {
+    const junkPatterns = [
+      /^\s*(skip to content|jump to content|main menu|navigation|menu|search|close|open menu)\s*$/i,
+      /^\s*(sign in|log in|login|register|subscribe|newsletter|share|follow us)\s*$/i,
+      /^\s*(facebook|twitter|x|telegram|instagram|linkedin|youtube|whatsapp|reddit|pinterest)\s*$/i,
+      /^\s*(advertisement|advertisements|sponsored|cookie settings|accept cookies)\s*$/i,
+      /^\s*(privacy policy|terms of service|all rights reserved|copyright)\s*$/i,
+      /^\s*(menyu|qidiruv|kirish|ro'yxatdan o'tish|obuna|ulashish|reklama)\s*$/i,
+      /^\s*(политика конфиденциальности|условия использования|реклама|подписаться|войти|поиск)\s*$/i,
+      /^\s*©\s*\d{4}.*$/i
+    ];
+
+    const lines = normalizeNewlines(md)
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // images are rarely useful in Word text dump
+      .split('\n');
+
+    const seen = new Map();
+    const out = [];
+
+    for (let rawLine of lines) {
+      let line = rawLine.replace(/[ \t]+$/g, '');
+      const trimmed = line.trim();
+      const compact = normalizeForCompare(trimmed);
+
+      if (!trimmed) {
+        out.push('');
+        continue;
+      }
+
+      if (/^[-=_*~]{3,}$/.test(trimmed)) continue;
+      if (junkPatterns.some(rx => rx.test(trimmed))) continue;
+
+      // Drop tiny repeated nav/footer labels after first occurrence.
+      const count = seen.get(compact) || 0;
+      seen.set(compact, count + 1);
+      if (compact.length < 55 && count >= 1) continue;
+      if (compact.length >= 55 && count >= 2) continue;
+
+      out.push(line);
+    }
+
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function tidyMarkdown(md) {
+    md = normalizeNewlines(md)
+      .replace(/\t/g, '  ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const lines = md.split('\n');
+    const out = [];
+
+    for (let line of lines) {
+      let t = line.trim();
+      if (!t) { out.push(''); continue; }
+
+      // Normalize heading spacing, list markers and blockquotes.
+      t = t.replace(/^(#{1,6})\s*(.+)$/, '$1 $2');
+      t = t.replace(/^[-*+]\s+/, '• ');
+      t = t.replace(/^>\s?/, '❝ ');
+      out.push(t);
+    }
+
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function markdownToPlain(md, opts = {}) {
+    const keepLinks = opts.keepLinks !== false;
+    const keepStructure = opts.keepStructure !== false;
+    md = normalizeNewlines(md || '')
+      .replace(/```[\s\S]*?```/g, block => block.replace(/```[^\n]*\n?|```/g, ''))
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, link) => keepLinks ? `${text} (${link})` : text)
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1');
+
+    const lines = md.split('\n');
+    const out = [];
+
+    for (let line of lines) {
+      let t = line.trim();
+      if (!t) { out.push(''); continue; }
+
+      // Markdown table separator line
+      if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(t)) continue;
+
+      const h = t.match(/^(#{1,6})\s+(.+)$/);
+      if (h) {
+        const heading = cleanupInline(h[2]);
+        if (keepStructure) {
+          out.push('');
+          out.push(heading.toUpperCase());
+          out.push('-'.repeat(Math.min(heading.length, 70)));
+        } else {
+          out.push(heading);
+        }
+        continue;
+      }
+
+      t = t.replace(/^[-*+]\s+/, '• ');
+      t = t.replace(/^>\s?/, '❝ ');
+      t = t.replace(/^\|(.+)\|$/, (_, row) => row.split('|').map(c => cleanupInline(c)).join('    |    '));
+      out.push(cleanupInline(t));
+    }
+
+    return out.join('\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function cleanupInline(str) {
+    return (str || '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^\s+|\s+$/g, '');
+  }
+
+  function finalTextCleanup(text) {
+    return normalizeNewlines(text)
+      .split('\n')
+      .map(line => line.replace(/[ \t]+$/g, ''))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function finalMarkdownCleanup(md) {
+    return normalizeNewlines(md || '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function normalizeForCompare(str) {
+    return (str || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  }
+
+  function countWords(str) {
+    return (str || '').split(/\s+/).filter(Boolean).length;
+  }
+
+  // ─── Progress & Logs ──────────────────────────────────────────────────────
+  function updateProgress(done, total, currentUrl) {
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressCount').textContent = `${done} / ${total}`;
+    if (currentUrl) {
+      document.getElementById('progressTitle').textContent =
+        `Yuklanmoqda ${done + 1}/${total}...`;
+    }
+  }
+
+  function log(msg, type = '') {
+    const area = document.getElementById('logArea');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + type;
+    line.textContent = msg;
+    area.appendChild(line);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  // ─── Preview ──────────────────────────────────────────────────────────────
+  function showPreview() {
+    const combined = buildDocument();
+    const wordCount = countWords(combined);
+    const charCount = combined.length;
+
+    document.getElementById('statPages').textContent = scrapedData.length;
+    document.getElementById('statWords').textContent = wordCount.toLocaleString();
+    document.getElementById('statChars').textContent = charCount.toLocaleString();
+    document.getElementById('previewText').textContent = combined.slice(0, 4000) +
+      (combined.length > 4000 ? '\n\n[... ko\'proq matn bor, faylda to\'liq ...]' : '');
+
+    document.getElementById('previewBlock').classList.add('visible');
+    document.getElementById('actionsBar').style.display = 'flex';
+    document.getElementById('actionsBar').style.flexWrap = 'wrap';
+    document.getElementById('actionsBar').style.justifyContent = 'center';
+  }
+
+  // ─── Document builder ─────────────────────────────────────────────────────
+  function buildDocument() {
+    const includeTitle  = opt('opt-title');
+    const includeSource = opt('opt-source');
+    const includeDate   = opt('opt-date');
+
+    const parts = [];
+
+    if (includeTitle) {
+      parts.push('WEBGRAB — TARTIBLI MATN TO\'PLAMI');
+      parts.push('='.repeat(60));
+    }
+    if (includeDate) parts.push('Sana: ' + new Date().toLocaleString('uz-UZ'));
+    if (includeTitle || includeDate) parts.push('');
+
+    scrapedData.forEach((item) => {
+      const heading = item.title || item.url;
+      parts.push('─'.repeat(60));
+      parts.push(`SAHIFA ${item.index}: ${heading}`);
+      parts.push('─'.repeat(60));
+      if (includeSource) parts.push(`Manba: ${item.url}`);
+      parts.push(`So'zlar: ${countWords(item.text).toLocaleString()} | Belgilar: ${item.text.length.toLocaleString()}`);
+      parts.push('');
+      parts.push(item.text);
+      parts.push('');
+      parts.push('');
+    });
+
+    return parts.join('\n').trim() + '\n';
+  }
+
+  // ─── Downloads ────────────────────────────────────────────────────────────
+  function downloadWord() {
+    const content = buildDocument();
+    const includeTitle  = opt('opt-title');
+    const includeSource = opt('opt-source');
+    const includeDate   = opt('opt-date');
+    const plainOnly     = opt('opt-clean');
+
+    const pagesHtml = scrapedData.map((item, i) => {
+      const title = item.title || `Sahifa ${i+1}`;
+      const bodyHtml = plainOnly
+        ? plainTextToHtml(item.text)
+        : markdownToWordHtml(item.markdown || item.text);
+
+      return `
+        <section class="page-section">
+          <h2>${i+1}. ${escapeHtml(title)}</h2>
+          ${includeSource ? `<div class="source">🔗 ${escapeHtml(item.url)}</div>` : ''}
+          <div class="page-stats">So'zlar: ${countWords(item.text).toLocaleString()} · Belgilar: ${item.text.length.toLocaleString()}</div>
+          <div class="content">${bodyHtml}</div>
+        </section>`;
+    }).join('\n');
+
+    // HTML with .doc extension: Microsoft Word opens it as a rich document.
+    const htmlContent = `
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>WebGrab Natija</title>
+<style>
+  @page { margin: 2cm; }
+  body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.55; color: #111; }
+  h1 { font-size: 20pt; font-weight: bold; color: #17315f; border-bottom: 2px solid #17315f; padding-bottom: 7pt; margin: 0 0 14pt; }
+  h2 { font-size: 15pt; font-weight: bold; color: #244a86; margin-top: 20pt; margin-bottom: 6pt; border-left: 4px solid #5577bb; padding-left: 8pt; }
+  h3 { font-size: 13pt; color: #333; margin-top: 14pt; margin-bottom: 5pt; }
+  h4, h5, h6 { font-size: 12pt; color: #333; margin-top: 12pt; margin-bottom: 4pt; }
+  p { margin: 0 0 8pt; }
+  ul, ol { margin-top: 4pt; margin-bottom: 8pt; }
+  li { margin-bottom: 3pt; }
+  blockquote { margin: 8pt 0 8pt 18pt; padding-left: 10pt; border-left: 3px solid #aaa; color: #444; }
+  pre { font-family: Consolas, monospace; font-size: 10pt; background: #f5f5f5; border: 1px solid #ddd; padding: 8pt; white-space: pre-wrap; }
+  code { font-family: Consolas, monospace; }
+  a { color: #1b5e9e; text-decoration: none; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0 12pt; }
+  th, td { border: 1px solid #bbb; padding: 5pt; vertical-align: top; }
+  th { background: #eef3ff; font-weight: bold; }
+  .meta { color: #555; font-size: 10pt; margin-bottom: 16pt; }
+  .source { color: #2266aa; font-size: 10pt; font-style: italic; margin-bottom: 4pt; }
+  .page-stats { color: #777; font-size: 9pt; margin-bottom: 10pt; }
+  .page-section { page-break-before: auto; border-top: 1px solid #ccc; padding-top: 10pt; margin-top: 14pt; }
+</style>
+</head>
+<body>
+${includeTitle ? `<h1>WebGrab — Tartibli Matn To'plami</h1>` : ''}
+<div class="meta">
+  ${includeDate ? `Sana: ${new Date().toLocaleString('uz-UZ')}<br>` : ''}
+  Sahifalar soni: ${scrapedData.length}<br>
+  Jami so'zlar: ${countWords(content).toLocaleString()}<br>
+  Jami belgilar: ${content.length.toLocaleString()}
+</div>
+${pagesHtml}
+</body>
+</html>`;
+
+    const blob = new Blob(['\ufeff' + htmlContent], {
+      type: 'application/msword;charset=utf-8'
+    });
+    downloadBlob(blob, makeFilename('webgrab-tartibli', 'doc'));
+  }
+
+  function downloadTxt() {
+    const content = buildDocument();
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, makeFilename('webgrab-tartibli', 'txt'));
+  }
+
+  async function copyToClipboard() {
+    const content = buildDocument();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        fallbackCopy(content);
+      }
+      log('📋 Matn clipboardga nusxalandi', 'ok');
+      alert('Matn nusxalandi ✅');
+    } catch (e) {
+      fallbackCopy(content);
+      log('📋 Matn clipboardga nusxalandi', 'ok');
+      alert('Matn nusxalandi ✅');
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+
+  function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function makeFilename(base, ext) {
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g, '-');
+    return `${base}-${stamp}.${ext}`;
+  }
+
+  // ─── Minimal Markdown → Word-friendly HTML renderer ───────────────────────
+  function markdownToWordHtml(md) {
+    md = normalizeNewlines(md || '');
+    const lines = md.split('\n');
+    let html = '';
+    let para = [];
+    let inUl = false;
+    let inOl = false;
+    let inPre = false;
+    let preLines = [];
+
+    function flushPara() {
+      if (para.length) {
+        html += `<p>${renderInline(para.join(' '))}</p>\n`;
+        para = [];
+      }
+    }
+    function closeLists() {
+      if (inUl) { html += '</ul>\n'; inUl = false; }
+      if (inOl) { html += '</ol>\n'; inOl = false; }
+    }
+    function flushPre() {
+      if (inPre) {
+        html += `<pre>${escapeHtml(preLines.join('\n'))}</pre>\n`;
+        preLines = [];
+        inPre = false;
+      }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      const t = line.trim();
+
+      if (/^```/.test(t)) {
+        if (inPre) flushPre();
+        else { flushPara(); closeLists(); inPre = true; preLines = []; }
+        continue;
+      }
+      if (inPre) { preLines.push(line); continue; }
+
+      if (!t) { flushPara(); closeLists(); continue; }
+
+      // Tables: header line + separator line.
+      if (looksLikeTableRow(t) && i + 1 < lines.length && looksLikeTableSep(lines[i+1].trim())) {
+        flushPara(); closeLists();
+        const tableRows = [t];
+        i += 2;
+        while (i < lines.length && looksLikeTableRow(lines[i].trim())) {
+          tableRows.push(lines[i].trim());
+          i++;
+        }
+        i--;
+        html += renderTable(tableRows);
+        continue;
+      }
+
+      const h = t.match(/^(#{1,6})\s+(.+)$/);
+      if (h) {
+        flushPara(); closeLists();
+        const level = Math.min(h[1].length + 1, 6); // page title is h2; content starts from h3 visually
+        html += `<h${level}>${renderInline(h[2])}</h${level}>\n`;
+        continue;
+      }
+
+      const ul = t.match(/^(?:[-*+]|•)\s+(.+)$/);
+      if (ul) {
+        flushPara();
+        if (inOl) { html += '</ol>\n'; inOl = false; }
+        if (!inUl) { html += '<ul>\n'; inUl = true; }
+        html += `<li>${renderInline(ul[1])}</li>\n`;
+        continue;
+      }
+
+      const ol = t.match(/^\d+[.)]\s+(.+)$/);
+      if (ol) {
+        flushPara();
+        if (inUl) { html += '</ul>\n'; inUl = false; }
+        if (!inOl) { html += '<ol>\n'; inOl = true; }
+        html += `<li>${renderInline(ol[1])}</li>\n`;
+        continue;
+      }
+
+      const quote = t.match(/^>\s?(.+)$/) || t.match(/^❝\s?(.+)$/);
+      if (quote) {
+        flushPara(); closeLists();
+        html += `<blockquote>${renderInline(quote[1])}</blockquote>\n`;
+        continue;
+      }
+
+      para.push(t);
+    }
+
+    flushPre();
+    flushPara();
+    closeLists();
+    return html || '<p></p>';
+  }
+
+  function plainTextToHtml(text) {
+    return normalizeNewlines(text || '')
+      .split(/\n{2,}/)
+      .map(block => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+      .join('\n');
+  }
+
+  function looksLikeTableRow(line) {
+    return /^\|.*\|$/.test(line) && line.split('|').length >= 3;
+  }
+
+  function looksLikeTableSep(line) {
+    return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line);
+  }
+
+  function renderTable(rows) {
+    const parsed = rows.map(row => row.replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
+    const head = parsed[0] || [];
+    const body = parsed.slice(1);
+    let html = '<table>\n<tr>' + head.map(c => `<th>${renderInline(c)}</th>`).join('') + '</tr>\n';
+    body.forEach(r => {
+      html += '<tr>' + r.map(c => `<td>${renderInline(c)}</td>`).join('') + '</tr>\n';
+    });
+    return html + '</table>\n';
+  }
+
+  function renderInline(str) {
+    let s = escapeHtml(str || '');
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '');
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => `<a href="${escapeAttr(url)}">${text}</a>`);
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
+    return s;
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str).replace(/`/g, '&#96;');
+  }
+
+  // ─── Reset ────────────────────────────────────────────────────────────────
+  function resetAll() {
+    urls = [];
+    scrapedData = [];
+    renderUrlList();
+    document.getElementById('progressBlock').classList.remove('visible');
+    document.getElementById('previewBlock').classList.remove('visible');
+    document.getElementById('actionsBar').style.display = 'none';
+    document.getElementById('progressTitle').textContent = 'Ishlanmoqda...';
+    document.getElementById('progressTitle').classList.add('pulsing');
+    document.getElementById('scrapeBtn').disabled = false;
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // Init
+  renderUrlList();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
